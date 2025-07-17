@@ -229,6 +229,65 @@ echo "YOUR_GENERATED_TOKEN" | wrangler secret put ACCESS_TOKEN
 - **Cloudflare R2**: $0.015/GB storage, $0.36/million requests
 - **Processing Time**: ~5x playback speed (10 min video = ~2 min processing)
 
+## Troubleshooting
+
+### Common Issues
+
+#### 1. "Configuration errors" - Missing Environment Variables
+
+**Problem**: When running locally, you get errors like:
+```
+Configuration errors:
+- CLOUDFLARE_ACCOUNT_ID is required
+- SALAD_API_KEY is required
+```
+
+**Root Cause**: The transcription pipeline has both local Node.js and Cloudflare Worker deployments. The local version expects a `.env` file, but the production system uses Cloudflare Worker secrets.
+
+**Solution**: 
+- **For local development**: Create a `.env` file with all required variables
+- **For production**: Use the deployed Cloudflare Worker API endpoints with proper authentication
+
+#### 2. "Unauthorized" Errors with Worker API
+
+**Problem**: Getting 401 Unauthorized when calling worker endpoints.
+
+**Root Cause**: The ACCESS_TOKEN secret was not properly set or has been reset.
+
+**Solution**:
+```bash
+# Generate a new secure token
+openssl rand -base64 32
+
+# Set it in Cloudflare Worker secrets
+echo "YOUR_GENERATED_TOKEN" | wrangler secret put ACCESS_TOKEN
+
+# Redeploy the worker
+wrangler deploy
+```
+
+#### 3. File Already in R2 but Local Pipeline Can't Find It
+
+**Problem**: You have a file in R2 storage but the local pipeline can't process it.
+
+**Root Cause**: The local pipeline expects files to be uploaded through its process, while the Cloudflare Worker can handle existing R2 files.
+
+**Solution**: Use the worker's debug endpoint to process existing R2 files:
+```bash
+curl -X POST https://transcription-worker.mike-522.workers.dev/debug/start-transcription \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jobId": "job-$(date +%s)", "fileKey": "uploads/your-file.m4a"}'
+```
+
+### Best Practices to Avoid Future Issues
+
+1. **Always use the deployed worker for production** - The local Node.js version is for development only
+2. **Store secrets properly** - Use `wrangler secret put` for sensitive data
+3. **Document your ACCESS_TOKEN** - Store it securely (password manager) as it's not visible in Cloudflare dashboard
+4. **Test authentication first** - Use the `/auth/validate` endpoint to verify your token works
+5. **Monitor worker logs** - Check Cloudflare dashboard for error logs if issues occur
+
 ## Support
 
 For issues or questions:
@@ -236,6 +295,7 @@ For issues or questions:
 - Verify all environment variables are correctly set
 - Ensure your R2 object exists and is a supported media format
 - Test your Airtable webhook URL independently
+- Use the troubleshooting section above for common problems
 
 ## License
 
