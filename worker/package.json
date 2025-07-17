@@ -1,0 +1,42 @@
+{
+  "name": "transcription-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for transcription tool using Salad.com API",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "tsc",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "db:create": "wrangler d1 create transcription-db",
+    "db:migrate": "wrangler d1 migrations apply transcription-db",
+    "db:local": "wrangler d1 execute transcription-db --local --command=\"SELECT * FROM transcription_jobs ORDER BY created_at DESC LIMIT 10;\"",
+    "r2:create": "wrangler r2 bucket create transcription-files",
+    "setup": "npm run r2:create && npm run db:create",
+    "test": "vitest",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^3.12.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20231025.0",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0",
+    "wrangler": "^3.22.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "transcription",
+    "cloudflare",
+    "workers",
+    "salad",
+    "airtable",
+    "r2"
+  ],
+  "author": "Mike Cardona",
+  "license": "MIT"
+}

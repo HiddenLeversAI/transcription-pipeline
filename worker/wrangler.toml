@@ -1,0 +1,41 @@
+name = "transcription-worker"
+main = "src/index.ts"
+compatibility_date = "2023-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Environment variables (set these in Cloudflare dashboard or via CLI)
+[vars]
+WORKER_URL = "https://transcription-worker.mike-522.workers.dev"
+SALAD_ORG_NAME = "leverage"
+R2_PUBLIC_URL = "https://pub-d60f432cf8d0470295c4a0cc828567ef.r2.dev"
+
+# Secrets (set these via: wrangler secret put SECRET_NAME)
+# SALAD_API_KEY = "your-salad-api-key"
+# SALAD_ORG_NAME = "your-salad-org-name"
+# ACCESS_TOKEN = "your-secure-access-token"
+# AIRTABLE_WEBHOOK_URL = "https://hooks.airtable.com/workflows/..."
+
+# R2 bucket binding
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "transcription-files"
+preview_bucket_name = "transcription-files-preview"
+
+# D1 database binding
+[[d1_databases]]
+binding = "DB"
+database_name = "transcription-db"
+database_id = "d416550f-77cc-46c9-a5df-197b4d38c535"
+
+# Routes for custom domain (optional)
+# routes = [
+#   { pattern = "api.yourdomain.com/*", zone_name = "yourdomain.com" }
+# ]
+
+# Worker settings
+[build]
+command = "npm run build"
+
+# Enable logging for debugging
+[observability.logs]
+enabled = true

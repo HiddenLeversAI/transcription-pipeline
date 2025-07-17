@@ -1,0 +1,26 @@
+{
+  "name": "transcription-pipeline",
+  "version": "1.0.0",
+  "description": "Automated transcription pipeline using Cloudflare R2, Salad.com, and Airtable",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": ["transcription", "cloudflare", "r2", "salad", "airtable", "automation"],
+  "author": "Mike Cardona",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.540.0",
+    "@aws-sdk/s3-request-presigner": "^3.540.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  }
+}
