@@ -58,9 +58,29 @@ SALAD_API_URL=your_salad_api_url
 
 # Airtable Configuration
 AIRTABLE_WEBHOOK_URL=your_airtable_webhook_url
+
+# Worker Authentication (for Cloudflare Workers deployment)
+ACCESS_TOKEN=your_secure_access_token
 ```
 
-### 3. Build the Project
+### 3. Configure Cloudflare Worker Secrets
+
+For the Cloudflare Worker deployment, set these secrets using `wrangler`:
+
+```bash
+# Navigate to worker directory
+cd worker
+
+# Set the ACCESS_TOKEN secret
+wrangler secret put ACCESS_TOKEN
+
+# Set other required secrets
+wrangler secret put SALAD_API_KEY
+wrangler secret put AIRTABLE_WEBHOOK_URL
+wrangler secret put SALAD_WEBHOOK_SECRET
+```
+
+### 4. Build the Project
 
 ```bash
 npm run build
@@ -68,7 +88,29 @@ npm run build
 
 ## Usage
 
-### CLI Interface
+### Cloudflare Worker API (Recommended)
+
+The transcription pipeline is deployed as a Cloudflare Worker. Use the API endpoints:
+
+```bash
+# Get upload URL for a new file
+curl -X POST https://transcription-worker.mike-522.workers.dev/upload/signed-url \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"filename": "audio.m4a", "fileSize": 10000000}'
+
+# Check job status
+curl -X GET "https://transcription-worker.mike-522.workers.dev/job/JOB_ID/status" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# Start transcription for existing R2 file (debug endpoint)
+curl -X POST https://transcription-worker.mike-522.workers.dev/debug/start-transcription \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"jobId": "job-123", "fileKey": "uploads/file.m4a"}'
+```
+
+### CLI Interface (Local Development)
 
 Process a single file:
 
@@ -155,6 +197,24 @@ The pipeline includes comprehensive error handling:
 - **Network Errors**: Timeout handling, retry logic, connection issues
 
 Error webhooks are automatically sent to Airtable for failed jobs.
+
+## Security
+
+- **ACCESS_TOKEN**: Use a strong, randomly generated token (minimum 32 characters)
+- **Environment Variables**: Never commit secrets to version control
+- **Cloudflare Secrets**: Store sensitive data using `wrangler secret put`
+- **Authentication**: All API endpoints require Bearer token authentication
+- **Rate Limiting**: Consider implementing rate limiting for production use
+
+### Generating a Secure ACCESS_TOKEN
+
+```bash
+# Generate a secure token
+openssl rand -base64 32
+
+# Set it as a Cloudflare Worker secret
+echo "YOUR_GENERATED_TOKEN" | wrangler secret put ACCESS_TOKEN
+```
 
 ## Scripts
 
