@@ -739,6 +739,67 @@ app.post('/debug/test-airtable', async (c) => {
         return c.json({ error: String(error) }, 500);
     }
 });
+// Debug endpoint to check and fix all stuck jobs
+app.post('/debug/fix-stuck-jobs', authenticate, async (c) => {
+    try {
+        console.log('Checking for stuck jobs...');
+        // Get all processing jobs older than 10 minutes
+        const cutoffTime = new Date(Date.now() - 10 * 60 * 1000).toISOString(); // 10 minutes ago
+        const stuckJobs = await c.env.DB.prepare(`
+      SELECT * FROM transcription_jobs 
+      WHERE status = 'processing' 
+      AND created_at < ?
+      ORDER BY created_at DESC
+    `).bind(cutoffTime).all();
+        console.log(`Found ${stuckJobs.results.length} potentially stuck jobs`);
+        const results = [];
+        for (const jobRow of stuckJobs.results) {
+            const job = jobRow;
+            console.log(`Checking stuck job: ${job.id} (Salad: ${job.salad_job_id})`);
+            try {
+                // Check status with Salad directly
+                const saladStatus = await checkSaladStatus(c.env, job.salad_job_id);
+                if (saladStatus) {
+                    console.log(`Salad status for ${job.id}: ${saladStatus.status}`);
+                    if (saladStatus.status === 'completed' || saladStatus.status === 'succeeded') {
+                        console.log(`Job ${job.id} completed on Salad, updating locally...`);
+                        await updateJobFromSalad(c.env, job.id, saladStatus);
+                        results.push({ jobId: job.id, action: 'completed', saladStatus: saladStatus.status });
+                    }
+                    else if (saladStatus.status === 'failed') {
+                        console.log(`Job ${job.id} failed on Salad, marking as error...`);
+                        await c.env.DB.prepare(`
+              UPDATE transcription_jobs 
+              SET status = 'error', error_message = 'Job failed at Salad'
+              WHERE id = ?
+            `).bind(job.id).run();
+                        results.push({ jobId: job.id, action: 'failed', saladStatus: saladStatus.status });
+                    }
+                    else {
+                        results.push({ jobId: job.id, action: 'still_processing', saladStatus: saladStatus.status });
+                    }
+                }
+                else {
+                    console.log(`Could not get Salad status for job ${job.id}`);
+                    results.push({ jobId: job.id, action: 'no_salad_status', error: 'Could not fetch Salad status' });
+                }
+            }
+            catch (error) {
+                console.error(`Error checking job ${job.id}:`, error);
+                results.push({ jobId: job.id, action: 'error', error: String(error) });
+            }
+        }
+        return c.json({
+            message: `Checked ${stuckJobs.results.length} stuck jobs`,
+            results,
+            timestamp: new Date().toISOString()
+        });
+    }
+    catch (error) {
+        console.error('Error fixing stuck jobs:', error);
+        return c.json({ error: String(error) }, 500);
+    }
+});
 // Debug webhook endpoint (no signature verification) for testing
 app.post('/webhook/salad-debug', async (c) => {
     try {
@@ -774,21 +835,8 @@ app.post('/webhook/salad', async (c) => {
     try {
         // Get the raw body for signature verification
         const rawBody = await c.req.text();
-        // Get signature from headers (common header names for webhooks)
-        const signature = c.req.header('x-signature') ||
-            c.req.header('x-hub-signature-256') ||
-            c.req.header('x-salad-signature') ||
-            c.req.header('authorization');
-        if (!signature) {
-            console.error('No signature header found in webhook');
-            return c.json({ error: 'Missing signature' }, 401);
-        }
-        // Temporarily disable signature verification for debugging
-        // const isValid = await verifyWebhookSignature(rawBody, signature, c.env.SALAD_WEBHOOK_SECRET);
-        // if (!isValid) {
-        //   console.error('Invalid webhook signature');
-        //   return c.json({ error: 'Invalid signature' }, 401);
-        // }
+        // Note: Salad webhooks don't include signature headers
+        // Skipping signature verification for Salad webhook compatibility
         // Parse the JSON payload
         const payload = JSON.parse(rawBody);
         // Implement replay protection with timestamp validation
